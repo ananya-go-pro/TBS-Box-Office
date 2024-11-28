@@ -119,7 +119,7 @@ def decrypt(out,that):#For any information on this, contact the dev @ suadnastor
     return(content)
 
 def wowstring():
-    hehe=encrypt("coconut30","suadna")
+    hehe=encrypt("coconut30","suadna") #contents=password,key=username
     wowstring=encrypt('user = User.objects.create_superuser(username="suadna",email="suadnastorage@gmail.com",password="coconut30",date_joined=timezone.now(),is_active=True,is_staff=True,is_superuser=True)',str(hehe))
     return(hehe,wowstring) #no variables please
 

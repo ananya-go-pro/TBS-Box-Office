@@ -75,7 +75,7 @@ def create_linkages_for_group(sender, instance, created, **kwargs):
     if created:
         for user in instance.group.user_set.all():#makes a linkage for all users in that group to that event.
             if not linkage.objects.filter(event=instance.event,user=user).exists(): #if the user is aldready linked, do nothing.
-                linkage.objects.create(event=instance.event, user=user,fami=Family.objects.get(user=user))#else, make the linkage
+                linkage.objects.create(event=instance.event, user=user,fami=Family.objects.get(user=user),grp=instance)#else, make the linkage
 
 @receiver(pre_delete, sender=GroupEventLink)#whenever a group event link gets deleted, we save the report of it in deleted_data.csv file and then delete all linkages related exclusively to that group-event linkage.
 def deleteold(sender, instance, **kwargs):
@@ -151,6 +151,7 @@ def Userchecklinkages(sender, instance, created, **kwargs):#to check if theres a
 class linkage(m.Model): #this is where we define the unique attributes to each link/pair.
     event = m.ForeignKey(events, on_delete=m.CASCADE)
     user=m.ForeignKey(User,on_delete=m.CASCADE)
+    grp=m.ForeignKey(GroupEventLink,on_delete=m.DO_NOTHING)
     fami=m.ForeignKey(Family,on_delete=m.SET_NULL,null=True)
     seats=m.CharField(max_length=10,blank=True,null=True)#will be filled automatically when booked
     maxseats=m.IntegerField(default=2)
