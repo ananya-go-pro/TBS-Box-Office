@@ -6,6 +6,8 @@ from django.dispatch import receiver
 from csv import writer #for the deleted_data.csv file.
 import urllib.parse
 
+#TODO: Havent adressed deleting user-event linkages if the user is removed from the group that connected them (Tried in Usercheclinkages but have not done it.) (Rarely a problem but those are famous last words so try fixing it.)
+
 #If migrate throws errors, delete and recreate the sqlite3 file, delete all files 
 #from migrations except init files 
 #(including pycache) then makemigrations and migrate again. this will remove all saved 
@@ -100,7 +102,7 @@ def deleteold(sender, instance, **kwargs): #this may cause problems where someth
                 break 
         else: #if doesnt break => if exclusively in this grp-event link => to be deleted
             deltd+=1
-            if i.seats: #if he had booked seats
+            if i.seats: #if he had booked seats #TODO: check what this does and if it is nessecary.
                 if i.scanned: #if he had entered
                     scnd+=1
                     wait=str(i.scanned.strftime("%d/%m/%Y, %H:%M:%S"))
@@ -140,21 +142,23 @@ def deleteold(sender, instance, **kwargs): #this may cause problems where someth
 
     f.close()
 
-#TODO: continue cleaning from here
-@receiver(post_save, sender=Family)
-def Userchecklinkages(sender, instance, created, **kwargs):#to check if theres any new linkages to be made if a user is newely added (after the groupeventlink is added) or freshly added to that group.
+@receiver(post_save, sender=Family)#when a user is newly created (and added to groups), check if any event linkages to be made for him. (on saving of family, runs this.)
+def Userchecklinkages(sender, instance, created, **kwargs): 
     for grp in instance.user.groups.all():
         grpevents=grp.groupeventlink_set.all()
         for i in grpevents:
             if not linkage.objects.filter(event=i.event, user=instance.user).exists(): #if user aldready linked to event, leave
-                linkage.objects.create(event=i.event, user=instance.user,fami=instance,grp=i)#else, link user to event using this.
+                linkage.objects.create(event=i.event, user=instance.user,fami=instance,grp=i)#else, link user to event using this group.
+
+    #TODO: tries to delete the user-event linkages when the user is removed from the group, didnt work for some reason, have left it be as it is rarely a problem.
     '''
     for i in instance.user.linkage_set.all():#checking if the linkage is still valid. If we remove the user's groups, the linkage authorised through that group should be deleted.
         grpevents=GroupEventLink.objects.filter(event=i.event,group__user=instance.user)
         if grpevents==[]:#if this linkage(for i in all linkages of that user) belongs to some existing group of that user, do nothing
             i.delete()  #if it does not belong to any of that users groups, delete it.'''#FIX THIS. ITS RARELY A PROBLEM THO.
 
-class linkage(m.Model): #this is where we define the unique attributes to each link/pair.
+
+class linkage(m.Model): #this is where we define the unique attributes to each user-event linkage.
     event = m.ForeignKey(events, on_delete=m.CASCADE)
     user=m.ForeignKey(User,on_delete=m.CASCADE)
     grp=m.ForeignKey(GroupEventLink,on_delete=m.DO_NOTHING)
@@ -163,7 +167,8 @@ class linkage(m.Model): #this is where we define the unique attributes to each l
     maxseats=m.IntegerField(default=2)
     whenbooked=m.DateTimeField(auto_now=True)
     created=m.DateTimeField(auto_now_add=True)
-    #ticket=m.ImageField(blank=True,null=True)
+    #TODO: delete this ticket thing?
+    #ticket=m.ImageField(blank=True,null=True) #(can delete, no problem) if needed to save ticket as an image, generally a bad idea, leads to server load. If needed to save the tickets/QRs somehow, save it as a byte64 encrypted string instead.
     details=m.CharField(max_length=500,blank=True,null=True)#ticketdetails must be filled automatically when booked.
     emailsent=m.DateTimeField(blank=True,null=True)
     scanned=m.DateTimeField(blank=True,null=True)
@@ -171,12 +176,25 @@ class linkage(m.Model): #this is where we define the unique attributes to each l
     def __str__(self):
         return f"{self.user.username}-{self.event}"
     
-    class Meta:#YET TO FINISH, ask group and finish.
-        unique_together=[['event','user']]# a list of fields that should be associated together / unique together.
+    class Meta:
+        unique_together=[['event','user']] #unsure how important this is, but leaving it be. #TODO: check if its useful to add seats and such in this too, although not needed as there it is automated and there is no direct human input except buttons.
         #this means that we can put/ link a user in an event only once.
-        #try adding this for seats etc also...
 
-    #can acces with get, blah blah.
-    #to add via code, can get that particular event and then say event.user.add(<user>,through_defaults={'seats':'12,32'})
-    #event.save()
-    #if user.events.all() doesnt work to get the data, try user.events_set.all()
+
+#currently not the most efficient system, nor is it bug free, when dealing with large number of users and huge amount of data, it is prone to errors. In case of such errors, django's admin side is pretty intuitive and one can easily go and manually add what is missing for certain users or delete and create new ones if it is malfunctioning. 
+#The best practise is to keep the data fresh, avoid duplication and keep it minimal and avoid adding users in strange ways randomly in between.
+# After every year, the students must be purged from the database and new ones added with their new groups. 
+
+#my advice to best use the system is to create/import users with their groups and family details every year.
+#Then create events an group event links when needed, once the event is over, take the data and stats if needed and delete the group event links one by one, then delete the event
+#since when deleting the event directly, if there are users who are not exclusive to one group connected to that event, it might not delete or get recorded.
+#Hence causing more dead users to be in the system which could lead to problems and hassles in managing.
+#If there are users added after creation of grp-event links and added to those grps, the system should handle it, but it is always a good practise to check the users when you add a 
+# group-event link and further to check specific user linkages when those users are added later/seperately.
+#Further, at the end of every academic year, the users must all be removed (except superusers and staff) and new users must be imported/added with their new respective groups.
+#If there is a recurring/repeating event every year, DO NOT use the same event and run with the same old data trying to cancel and rebook or anything of the sort. instead
+#Delete the old grp-event linkages and the old event and create a new event and add the grp-event linkages. Use the system in a minimal way to keep it as simple as possible.
+#In case all the users of a system get deleted including the Superusers, there are two ways to get back into the system to operate it and add users as a superuser.
+#The tedious first method is to go to the server, stop it and run the djang-admin create superuser command. 
+# But there is another way which does not need nearly as much knowledge/effort and one can simply log in via the backup superuser. 
+# Please contact the developer at surajacharya2005@gmail.com to know more in case this happens. 
