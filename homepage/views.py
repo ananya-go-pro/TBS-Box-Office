@@ -1,18 +1,20 @@
 import datetime
-from django.forms import DateTimeField
 from django.shortcuts import render, redirect
 from django.contrib import messages #this is what we import to get flash messages.
 from django.contrib.auth.models import User
-from .models import linkage,events,General,Family
+from .models import linkage,events,General
 from django.contrib.auth import authenticate,login,logout #imported for the user login
 from django.contrib.auth.decorators import login_required,user_passes_test #this is used to restrict pages that need login or a certain login.
-from csv import*
-from django.utils import timezone
-from events.views import encrypt,decrypt,secret_code_suadna,secret_code_55A555
+from csv import reader #used to read from deleted_data.csv
+from events.views import encrypt,decrypt,secret_code_suadna,secret_code_55A555 
 
+
+#TODO: test everything cause i deleted a bunch of imports which i didnt see used.
 #TODO push to new branch and merge branches later.
 #TODO: server time to IST later
 #TODO: email stuff!
+#TODO: cleanup small trivial funcs?
+#TODO: number of seats booked in deleted data (prolly do it in models.) (maybe make that page cleaner?)
 
 class Small_trivial_functions():
     class Login():
@@ -65,6 +67,13 @@ class Small_trivial_functions():
         
         def get_details(linkage_instance): #this only works if the usn doesnt have a hyphen in it and the rest of the code is exactly as is.
             return({"USN":linkage_instance.user.username,"seats":linkage_instance.seats,"group":f"{linkage_instance.grp.group}","family":f"{linkage_instance.fami.Parent1}-{linkage_instance.fami.Parent2}-{linkage_instance.fami.Guardians}".replace("None","").replace("--", "-").strip("-"),"whenbooked":str(linkage_instance.whenbooked.strftime("%d/%m/%Y, %H:%M:%S")),"whenmade":str(linkage_instance.created.strftime("%d/%m/%Y, %H:%M:%S")),"details":linkage_instance.details,'emailsent':str(linkage_instance.emailsent.strftime("%d/%m/%Y, %H:%M:%S")),'event':linkage_instance.event})
+    
+    class Report():
+        def get_context(GI):
+            context={'logins':GI.logins,'logouts':GI.logouts,'emailsent':GI.emailsent,'QRscanned':GI.QRscanned,'Seatsbooked':GI.SeatsBooked,'Seatscancelled':GI.Seatscancelled,'whenupdated':GI.whenupdated}
+            context['nosiblings']=sum([len([i for i in j.siblingsbooked.strip('\' ,"').split(',') if i not in '\' ,"']) for j in events.objects.all() if j.siblingsbooked])
+            context['nowaiting']=sum([len([i for i in j.notifymail.split(',') if i not in ' ,']) for j in events.objects.all() if j.notifymail])
+            return(context)
 
 def helloworld(request):
     return(render(request,'firstpage.html'))
@@ -84,7 +93,7 @@ def loginPage(request):
 
     return(render(request,'hi.html'))
 
-@login_required(login_url='home')
+@login_required(login_url='home') #user must be logged in to access this page.
 def logoutPage(request):
     Small_trivial_functions.General_data_record("logouts")
     logout(request) 
@@ -110,22 +119,22 @@ def details(request,pk): #Admin comes here after scanning QR code.
 
     return(render(request,'details.html',context))
 
-@user_passes_test(lambda u: u.is_superuser,login_url='home') #if user is admin, let them see this page.
+@user_passes_test(lambda u: u.is_superuser,login_url='home') #if user is admin, let them access this page.
 def report(request):
     General_object_instance, created = General.objects.get_or_create(pk=1)
-    context={'logins':General_object_instance.logins,'logouts':General_object_instance.logouts,'emailsent':General_object_instance.emailsent,'QRscanned':General_object_instance.QRscanned,'Seatsbooked':General_object_instance.SeatsBooked,'Seatscancelled':General_object_instance.Seatscancelled,'whenupdated':General_object_instance.whenupdated}
-    context['nosiblings']=sum([len([i for i in j.siblingsbooked.strip('\' ,"').split(',') if i not in '\' ,"']) for j in events.objects.all() if j.siblingsbooked])
-    context['nowaiting']=sum([len([i for i in j.notifymail.split(',') if i not in ' ,']) for j in events.objects.all() if j.notifymail])
+
+    context=Small_trivial_functions.Report.get_context(General_object_instance)
+    
     return(render(request,'Grep.html',context))
 
-@user_passes_test(lambda u: u.is_superuser,login_url='home') #if user is admin, let them see this page.
+@user_passes_test(lambda u: u.is_superuser,login_url='home') #if user is admin, let them access this page.
 def adminlinks(request):
     return(render(request,'linktree.html')) 
 
-@user_passes_test(lambda u: u.is_superuser,login_url='home') #if user is admin, let them see this page.
+@user_passes_test(lambda u: u.is_superuser,login_url='home') #if user is admin, let them access this page.
 def deleted_data(request):
     f=open('deleted_data.csv','r')
-    r=reader(f)
-    context={'deleted':[i for i in r]}
+    context={'deleted':list(reader(f))}
     f.close()
+
     return(render(request,'delete.html',context))
