@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required,user_passes_test #this
 from csv import reader #used to read from deleted_data.csv
 from events.views import encrypt,decrypt,secret_code_suadna,secret_code_55A555 
 
-
+#TODO: while commiting to github final, ignore all pycache files (ask vin how to)
 #TODO: test everything cause i deleted a bunch of imports which i didnt see used.
 #TODO push to new branch and merge branches later.
 #TODO: server time to IST later

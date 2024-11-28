@@ -38,13 +38,12 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'suadnastorage@gmail.com'
 EMAIL_HOST_PASSWORD = 'Suadna@temp69'
 '''
-#APPEND_SLASH=False #temp
 
 #This is what I have added to ensure session logout after a certain time.
 # Close the session when the user closes the browser
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-# Set the session cookie age (in seconds) (change as you want)
-SESSION_COOKIE_AGE = 1200 #20 mins.
+# Set the session cookie age (in seconds) (change as needed)
+SESSION_COOKIE_AGE = 1200 #20 mins. 
 # Save the session on every request (to reset the session cookie age timer.)
 SESSION_SAVE_EVERY_REQUEST = True
 
@@ -59,7 +58,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'homepage',
     'events',
-]
+] #I added the last 2
 
 
 MIDDLEWARE = [
@@ -101,7 +100,7 @@ WSGI_APPLICATION = 'new.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3', #I couldnt reccomend using the default db.sqlite3 enough!!!
     }
 }
 
@@ -123,6 +122,7 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+#TODO: get rid of this next line, it allows weak passwords!!!!
 AUTH_PASSWORD_VALIDATORS = [] #REMOVE THIS. IT IS ONLY FOR PRODUCTION. IT ALLOWS THE PASSWORD TO BE WEAK. the above password validators ensure security. by overwriting the list and making it empty, we remove all these safety checks. this is only temporary so that I can test with simple passwords. Do not forget to remove during production.
 
 # Internationalization
@@ -130,7 +130,7 @@ AUTH_PASSWORD_VALIDATORS = [] #REMOVE THIS. IT IS ONLY FOR PRODUCTION. IT ALLOWS
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'UTC' #TODO: try changing to IST
 
 USE_I18N = True
 
@@ -144,7 +144,6 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS=[#telling django where we are keeping all our static files so that it can handle the rest.
     BASE_DIR/'static'
 ]
-#STATIC_ROOT=
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

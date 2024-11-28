@@ -1,3 +1,5 @@
+#THIS IS NOT MEANT TO BE SEEN BY ANYONE, IF THIS IS SEEN BY ANYONE BUT surajacharya2005@gmail.com, DO ME A FAVOR AND LET ME KNOW PLEASE.
+
 def encrypt(contents,that): #For any information on this, contact the dev @ suadnastorage@gmail.com (if no reply, can contact surajacharya2005@gmail.com)
     import random as rn
     key=''
