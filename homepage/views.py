@@ -15,6 +15,8 @@ from events.views import encrypt,decrypt,secret_code_suadna,secret_code_55A555
 #TODO: email stuff!
 #TODO: cleanup small trivial funcs?
 #TODO: number of seats booked in deleted data (prolly do it in models.) (maybe make that page cleaner?)
+#TODO once we get the csv database and know what it looks like, make a page to import users (create all data by self.)
+#TODO: currently, if suadna is deleted, it auto makes back but if it is just removed superuser status, gone, fix that. (add an if in the secret code.)
 
 class Small_trivial_functions():
     class Login():
