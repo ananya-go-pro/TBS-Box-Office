@@ -9,7 +9,9 @@ from django.contrib.auth.models import User
 admin.site.register(events)
 admin.site.register(GroupEventLink)
 
-class CustomUserAdmin(UserAdmin):
+#once a django user (student) is added, it immediatly takes you to the create family page and auto fills in the user OneToOneField to that user 
+# So that we can fill the details including family as one continous strech instead of having to go to family and create new and link it to that student for every student while manually adding.
+class CustomUserAdmin(UserAdmin):  #This function and the unregister and register after was written by Rahul in batch of 2025 on my request.
     """
     In the Django admin site, after editing a user's profile, this
     function redirects the admin to the Family page to view make changes
