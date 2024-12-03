@@ -68,7 +68,7 @@
     </style>
     <div class="space"></div>
     <h2>Events</h2>
-    {% if reports %}
+    {% if admin %}
     <div class="button">
         <a style="color:white;width:1;" href="/reports">General report</a>
     </div>
@@ -91,7 +91,7 @@
                     <p><strong>{{i.event}}</strong></p>
                     <p>{{i.Desc}}</p>
                     <p>{{i.Date}}</p>
-                    {% if reports %}
+                    {% if admin %}
                     <a style="width:100px;" href="/events/report/{{i.event}}/">See report</a>
                     <br>
                     <br>

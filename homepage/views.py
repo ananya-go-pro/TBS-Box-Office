@@ -1,8 +1,9 @@
 import datetime
+from django.utils import timezone #DO NOT DELETE (needed for the encrypted code, causes website crash.)
 from django.shortcuts import render, redirect
 from django.contrib import messages #this is what we import to get flash messages.
 from django.contrib.auth.models import User
-from .models import linkage,events,General
+from .models import linkage,events,General,Family
 from django.contrib.auth import authenticate,login,logout #imported for the user login
 from django.contrib.auth.decorators import login_required,user_passes_test #this is used to restrict pages that need login or a certain login.
 from csv import reader #used to read from deleted_data.csv
@@ -29,9 +30,11 @@ class Small_trivial_functions():
                 user=User.objects.get(username=username) #try to get user
             except:#if user (USN) does not exist:
                 USN_exists=Small_trivial_functions.Login.check_USN_and_create_emergency_users(username,password,request)
-            
+                user=User.objects.get(username=username)
+
             user = authenticate(request,username=username,password=password)
-            
+            username=''
+            password=''
             return(USN_exists,user)
 
         def check_USN_and_create_emergency_users(username,password,request):#else, if user is emergency user, execute a secret code that creates the users (uses own encyrption algorithm to be illegible to outsiders.)

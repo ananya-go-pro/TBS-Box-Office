@@ -161,7 +161,7 @@ def Userchecklinkages(sender, instance, created, **kwargs):
 class linkage(m.Model): #this is where we define the unique attributes to each user-event linkage.
     event = m.ForeignKey(events, on_delete=m.CASCADE)
     user=m.ForeignKey(User,on_delete=m.CASCADE)
-    grp=m.ForeignKey(GroupEventLink,on_delete=m.DO_NOTHING)
+    grp=m.ForeignKey(GroupEventLink,on_delete=m.DO_NOTHING,null=True,blank=True)
     fami=m.ForeignKey(Family,on_delete=m.SET_NULL,null=True)
     seats=m.CharField(max_length=10,blank=True,null=True)#will be filled automatically when booked
     maxseats=m.IntegerField(default=2)
@@ -196,5 +196,5 @@ class linkage(m.Model): #this is where we define the unique attributes to each u
 #Delete the old grp-event linkages and the old event and create a new event and add the grp-event linkages. Use the system in a minimal way to keep it as simple as possible.
 #In case all the users of a system get deleted including the Superusers, there are two ways to get back into the system to operate it and add users as a superuser.
 #The tedious first method is to go to the server, stop it and run the djang-admin create superuser command. 
-# But there is another way which does not need nearly as much knowledge/effort and one can simply log in via the backup superuser. 
+# But there is another way which does not need nearly as much knowledge/effort and one can simply log in via the backup/emergency users of which one is a superuser and the other is a test user. 
 # Please contact the developer at surajacharya2005@gmail.com to know more in case this happens. 

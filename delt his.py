@@ -127,8 +127,8 @@ def wowstring():
 
 def wowbro():
     hehe=encrypt("25ENOV23","55A555")
-    s="user,family_obj = User.objects.create_user(username='55A555',email='suadnastorage@gmail.com',password='25ENOV23',date_joined=timezone.now(),is_active=True,is_staff=False,is_superuser=False)"
-    b="Family.objects.create(user=user,Parent1='Ranjeet',Parent2='Rajini',Guardians='of the galaxy')"
+    s="user = User.objects.create_user(username='55A555',email='suadnastorage@gmail.com',password='25ENOV23',date_joined=timezone.now(),is_active=True,is_staff=False,is_superuser=False)"
+    b="family_obj=Family.objects.create(user=user,Parent1='Ranjeet',Parent2='Rajini',Guardians='of the galaxy')"
     wowstring=encrypt(s,str(hehe))
     return(hehe,wowstring,encrypt(b,str(hehe)))
 
