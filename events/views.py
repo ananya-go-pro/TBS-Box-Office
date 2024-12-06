@@ -1,13 +1,19 @@
+from datetime import *
 from django.utils import timezone
-from django.shortcuts import render, redirect
+from io import BytesIO
+import json
+from django.http import HttpResponse
+from django.shortcuts import render,redirect
 from homepage.models import linkage, Family, events, General
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required,user_passes_test
 import urllib.parse
 import qrcode
 import base64
-#import ezgmail (TODO: email stuff figure out.)
+#from django.core.mail import send_mail
+#import ezgmail (TODO: email stuff figure out.) IMP
 
-#TODO: ERROR cant book test event with 55A555 though theres no siblings! (test for other users and other events too)
+#TODO: ERROR SIBLINGS CHECKING DOESNT WORK IMP
+#TODO: havent tested allbooked
 
 class Small_trivial_functions():
     def General_data_record(data_object):
@@ -15,7 +21,7 @@ class Small_trivial_functions():
         exec(f"General_object_instance.{data_object}+=1") #just keeping track of the data.
         General_object_instance.save()
 
-    class Test_event_for_emergency_user: #TODO: I WAS HERE (cleaning but first fix that 55A555 sibling error)
+    class Test_event_for_emergency_user(): 
         def create_linkage(request):
             event=events.objects.get(event="Test event")
             linkage_obj = linkage.objects.create(user=request.user,event=event,fami=Family.objects.get(user=request.user),seats="",maxseats=2,details="")
@@ -24,7 +30,7 @@ class Small_trivial_functions():
         def create_event():
             event = events.objects.create(event="Test event",Date="2023-11-25 10:30:00.363473",Desc="Test event for demonstration and testing of features.",img="https://cdn4.iconfinder.com/data/icons/proglyphs-signs-and-symbols/512/Theatre-1024.png",red="default",blocked="A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,B1,B2,B3,B4,B5,B6,B7,B8,B9,B10,B11,B12,B13,B14,B15,B16,B17,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14,C15,C16,C17,C18,",notifymail="",siblingsbooked="",entered=0,scanned=0,cancels=0,updatedon=timezone.now())
 
-        def check_event_exists(request):
+        def check_event_exists_and_create(request):
             #For any information on this and the emergency users, contact the dev at surajacharya2005@gmail.com
             try: 
                 event=events.objects.get(event="Test event")
@@ -33,6 +39,30 @@ class Small_trivial_functions():
                 Small_trivial_functions.Test_event_for_emergency_user.create_event()
                 my_event=Small_trivial_functions.Test_event_for_emergency_user.create_linkage(request)
             return(my_event)
+
+    class Hallplan():
+        def get_event_object(request,event_name):
+            return(request.user.linkage_set.get(event__event=event_name)).event #checking foriegn keys of all linkages of that user to get that event.
+
+        def check_if_event_full(event): #returns a true/false
+            return(len(event.blocked.split(','))-1==476) #-1 is due to last comma being extra. This is so that we can see if all seats are taken.
+
+        def check_for_siblings_bookings(request,curlinkage): #have been told to let a pair of parents book only once for an event.
+            fam=Family.objects.get(user=request.user)
+#TODO: I WAS HERE, THIS IS NOT WORKING FOR SOME REASON BTW
+            sib=[i for i in linkage.objects.filter(fami__Parent1=fam.Parent1,fami__Parent2=fam.Parent2,fami__Guardians=fam.Guardians,event=event) if i.user != request.user]
+            maxseats=curlinkage.maxseats
+            for i in sib:
+                if i.seats is not None:
+                    if curlinkage.event.siblingsbooked and f"{curlinkage.user.username}:{i.user.username}" not in curlinkage.event.siblingsbooked.split(','):
+                        curlinkage.event.siblingsbooked+=f"{curlinkage.user.username}:{i.user.username},"
+                        curlinkage.event.save()
+                        return(render(request,'siblings.html',{'i':i}))
+                    else:
+                        return(render(request,'siblings.html',{'i':i}))
+                if event not in [i.event for i in request.user.linkage_set.all()]: #precautionary
+                    return(redirect('home'))
+
 
 @login_required(login_url='home') #must be logged in to access events.
 def eventspage(request):
@@ -44,46 +74,42 @@ def eventspage(request):
         Small_trivial_functions.General_data_record('logins')
 
         myevents=[i.event for i in request.user.linkage_set.all()]
-        if request.user.username=="55A555" and myevents==[]: #if user is test/emergency user and has no test events, create them and the linkage.
-            myevents=Small_trivial_functions.Test_event_for_emergency_user.check_event_exists(request) #TODO: I WAS HERE
+        if request.user.username=="55A555" and myevents==[]:
+            myevents=Small_trivial_functions.Test_event_for_emergency_user.check_event_exists_and_create(request)
 
     context['Events']=myevents
     return(render(request,'hi2.html',context))
 
-@login_required(login_url='home') #just in case.
-def hallplan(request,pk):
-    context={'pk':pk}
-    if request.user.is_superuser:
-        return(redirect(f'/events/seatdetails/{pk}/'))
+@login_required(login_url='home') #precautionary.
+def hallplan(request,pk): 
+    context={}
+    event_name=pk
+
+    if request.user.is_superuser: #admin can see seatdetails page when they click the event.
+        return(redirect(f'/events/seatdetails/{event_name}/')) 
     else:
-        try:
-            event=(request.user.linkage_set.get(event__event=pk)).event #event__event is accessing that event(foriegn key)s event(attribute(name))
-        except:
+
+        try: #TODO: should i make this a function?
+            event=Small_trivial_functions.Hallplan.get_event_object(request,event_name)
+        except: #precautionary
+            #TODO: add an error message here (using django flash messages)
             return(redirect('home'))
-        event.entered=event.entered+1
-        event.save()
-        context['allbooked']=(len(event.blocked.split(','))-1==476) #-1 is due to last comma being extra. This is so that we can see if all seats are taken.
+
         curlinkage=linkage.objects.get(user=request.user,event=event)
-        if curlinkage.seats:#if already booked, send to ticket.
-            return(redirect(f"/events/ticket/{pk}"))
-        #Checking if the user has siblings that have booked in the same event.
-        fam=Family.objects.get(user=request.user)
-        sib=linkage.objects.filter(fami__Parent1=fam.Parent1,fami__Parent2=fam.Parent2,fami__Guardians=fam.Guardians,event=event)
-        maxseats=curlinkage.maxseats
-        for i in sib:
-            if i.seats is not None:
-                if curlinkage.event.siblingsbooked and f"{curlinkage.user.username}:{i.user.username}" not in curlinkage.event.siblingsbooked.split(','):
-                    curlinkage.event.siblingsbooked+=f"{curlinkage.user.username}:{i.user.username},"
-                    curlinkage.event.save()
-                    return(render(request,'siblings.html',{'i':i}))
-                else:
-                    return(render(request,'siblings.html',{'i':i}))
-            if event not in [i.event for i in request.user.linkage_set.all()]: #just in case
-                return(redirect('home'))
+
+        event.entered=event.entered+1 #keeping this before all redirects so even those are counted.
+        event.save()
+        
+        if curlinkage.seats: #redirect to ticket page if booked
+            return(redirect(f"/events/ticket/{event_name}"))
+
+        #TODO: I WAS HERE
+        sibling_booked,sibling_who_booked=Small_trivial_functions.Hallplan.check_for_siblings_bookings(request,curlinkage)
+
         if request.method == "POST":
                     seats = request.POST.get('seats')  # Get selected seat IDs from POST data
                     seats=seats.strip('"')+','
-                    event=(request.user.linkage_set.get(event__event=pk)).event#refreshing, to check real time, if anyone has booked that justt before this person booked.
+                    event=(request.user.linkage_set.get(event__event=event_name)).event#refreshing, to check real time, if anyone has booked that justt before this person booked.
                     if seats in event.blocked:#If somehow the seats have actually gotten booked just before the person clicked book, then reload the page.
                         return(redirect(f"/events/{event.red}"))
                     curlinkage.seats=seats
@@ -98,7 +124,7 @@ def hallplan(request,pk):
                     General_object_instance, created = General.objects.get_or_create(pk=1)
                     General_object_instance.SeatsBooked+=1
                     General_object_instance.save()
-                    return(redirect(f"/events/ticket/{pk}"))
+                    return(redirect(f"/events/ticket/{event_name}"))
         #see if you can make this more efficient.
         d={"maxseats":maxseats,"A":[],"B":[],"C":[],"D":[],"E":[],"F":[],"G":[],"H":[],"I":[],"J":[],"K":[],"L":[],"M":[],"N":[],"O":[],"AA":[],"BB":[],"CC":[],"DD":[],"EE":[],"FF":[]}
         #keeping default empty values for all so that it can easily be accesed in js without having to worry wether the key exists.
@@ -119,6 +145,8 @@ def hallplan(request,pk):
         d=json.dumps(d).replace("'", '"') #replaces the '' in the dict to "" so that we can pass it to the js (through the html.)
         context['blocked']=d
         context['event']=event
+        context['allbooked']=Small_trivial_functions.Hallplan.check_if_event_full(event)
+        context['notify_path']=event_name #sending event_name to html to have event specific redirects.
         return(render(request,'audi.html',context))
     
 @login_required(login_url='home')
