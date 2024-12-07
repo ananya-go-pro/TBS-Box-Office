@@ -12,7 +12,6 @@ import base64
 #from django.core.mail import send_mail
 #import ezgmail (TODO: email stuff figure out.) IMP
 
-#TODO: ERROR SIBLINGS CHECKING DOESNT WORK IMP
 #TODO: havent tested allbooked
 
 class Small_trivial_functions():
@@ -47,21 +46,23 @@ class Small_trivial_functions():
         def check_if_event_full(event): #returns a true/false
             return(len(event.blocked.split(','))-1==476) #-1 is due to last comma being extra. This is so that we can see if all seats are taken.
 
+        def update_event_siblingsbooked(curlinkage,event,sibling): #update event records adding names of users who couldnt book because their siblings have.
+            if event.siblingsbooked and f"{curlinkage.user.username}:{sibling.user.username}" not in event.siblingsbooked.split(','):
+                event.siblingsbooked+=f"{curlinkage.user.username}:{sibling.user.username},"
+                event.save()
+
         def check_for_siblings_bookings(request,curlinkage): #have been told to let a pair of parents book only once for an event.
             fam=Family.objects.get(user=request.user)
-#TODO: I WAS HERE, THIS IS NOT WORKING FOR SOME REASON BTW
-            sib=[i for i in linkage.objects.filter(fami__Parent1=fam.Parent1,fami__Parent2=fam.Parent2,fami__Guardians=fam.Guardians,event=event) if i.user != request.user]
-            maxseats=curlinkage.maxseats
-            for i in sib:
-                if i.seats is not None:
-                    if curlinkage.event.siblingsbooked and f"{curlinkage.user.username}:{i.user.username}" not in curlinkage.event.siblingsbooked.split(','):
-                        curlinkage.event.siblingsbooked+=f"{curlinkage.user.username}:{i.user.username},"
-                        curlinkage.event.save()
-                        return(render(request,'siblings.html',{'i':i}))
-                    else:
-                        return(render(request,'siblings.html',{'i':i}))
-                if event not in [i.event for i in request.user.linkage_set.all()]: #precautionary
-                    return(redirect('home'))
+            sibling_who_booked=False
+            event=curlinkage.event
+
+            siblings_in_same_event=[i for i in linkage.objects.filter(fami__Parent1=fam.Parent1,fami__Parent2=fam.Parent2,fami__Guardians=fam.Guardians,event=event) if i.user != request.user]
+            for sibling in siblings_in_same_event:
+                if sibling.seats:
+                    sibling_who_booked=sibling
+                    Small_trivial_functions.Hallplan.update_event_siblingsbooked(curlinkage,event,sibling)
+            
+            return (sibling_who_booked)
 
 
 @login_required(login_url='home') #must be logged in to access events.
@@ -89,7 +90,7 @@ def hallplan(request,pk):
         return(redirect(f'/events/seatdetails/{event_name}/')) 
     else:
 
-        try: #TODO: should i make this a function?
+        try:
             event=Small_trivial_functions.Hallplan.get_event_object(request,event_name)
         except: #precautionary
             #TODO: add an error message here (using django flash messages)
@@ -100,12 +101,16 @@ def hallplan(request,pk):
         event.entered=event.entered+1 #keeping this before all redirects so even those are counted.
         event.save()
         
-        if curlinkage.seats: #redirect to ticket page if booked
+        #redirect to ticket page if aldready booked
+        if curlinkage.seats: 
             return(redirect(f"/events/ticket/{event_name}"))
 
-        #TODO: I WAS HERE
-        sibling_booked,sibling_who_booked=Small_trivial_functions.Hallplan.check_for_siblings_bookings(request,curlinkage)
+        #redirect to siblings page if sibling has booked (have been asked to let a pair of parents book only once.)
+        sibling_who_booked=Small_trivial_functions.Hallplan.check_for_siblings_bookings(request,curlinkage)
+        if sibling_who_booked:
+            return(render(request,'siblings.html',{'i':sibling_who_booked}))
 
+        #TODO: I WAS HERE
         if request.method == "POST":
                     seats = request.POST.get('seats')  # Get selected seat IDs from POST data
                     seats=seats.strip('"')+','
@@ -125,8 +130,10 @@ def hallplan(request,pk):
                     General_object_instance.SeatsBooked+=1
                     General_object_instance.save()
                     return(redirect(f"/events/ticket/{event_name}"))
+
+
         #see if you can make this more efficient.
-        d={"maxseats":maxseats,"A":[],"B":[],"C":[],"D":[],"E":[],"F":[],"G":[],"H":[],"I":[],"J":[],"K":[],"L":[],"M":[],"N":[],"O":[],"AA":[],"BB":[],"CC":[],"DD":[],"EE":[],"FF":[]}
+        d={"maxseats_user_can_book":curlinkage.maxseats,"A":[],"B":[],"C":[],"D":[],"E":[],"F":[],"G":[],"H":[],"I":[],"J":[],"K":[],"L":[],"M":[],"N":[],"O":[],"AA":[],"BB":[],"CC":[],"DD":[],"EE":[],"FF":[]}
         #keeping default empty values for all so that it can easily be accesed in js without having to worry wether the key exists.
         s=event.blocked
         l=s.split(',')
@@ -243,7 +250,7 @@ def cancel(request,pk):
             pass #TODO remove.
     return(redirect('home'))#can change this if wanted.
 
-#this code is meant to be hard to understand and illegbile. hence not cleaning.
+#TODO: REPLACE WITH CLEANED ENCRYPT AND TEST
 def encrypt(contents,that): #For any information on this, contact the dev @ suadnastorage@gmail.com (if no reply, can contact surajacharya2005@gmail.com)
     import random as rn
     key=''
@@ -304,7 +311,7 @@ def encrypt(contents,that): #For any information on this, contact the dev @ suad
     os.remove('store.dat')
     return(out)
 
-#this code is meant to be hard to understand and illegbile. hence not cleaning.
+#TODO: REPLACE WITH CLEANED VERSION FROM ENCRYPT AND TEST
 def decrypt(out,that):#For any information on this, contact the dev @ suadnastorage@gmail.com (if no reply, can contact surajacharya2005@gmail.com)
     import random as rn
     key=''

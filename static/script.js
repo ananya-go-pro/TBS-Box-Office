@@ -179,14 +179,14 @@ function selectSeat(seat) {
       selectedSeatIds = selectedSeatIds.filter((id) => id !== seatId); // Remove seat ID from the array
       updateSelectedSeatsInfo();//calls function 
     } else {
-      if (selectedSeats.length < blocked.maxseats) {//if the number of seats in the array is less than the amount thats been allowed to be chosen 
+      if (selectedSeats.length < blocked.maxseats_user_can_book) {//if the number of seats in the array is less than the amount thats been allowed to be chosen 
         seat.classList.add("selected");
         selectedSeats.push(seat); //pushes seat number into selectedSeats array.
         selectedSeatIds.push(seatId); // Add seat ID to the selectedSeatsIds array.
         updateSelectedSeatsInfo();
       } else {//making the integer value to string, to concat overall in alert 
         const s="You can only select up to ";
-        const q=blocked.maxseats.toString();
+        const q=blocked.maxseats_user_can_book.toString();
         const w=" seats.";
         const t=s.concat(q,w)
         alert(t);
