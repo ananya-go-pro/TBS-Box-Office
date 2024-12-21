@@ -11,6 +11,7 @@ import qrcode
 import base64
 #from django.core.mail import send_mail
 #import ezgmail (TODO: email stuff figure out.) IMP
+#TODO: add flash error messages everywhere you should. If only the devs need to know, put it into console.log?
 
 current_domain='127.0.0.1:8000/'#HERE, THE 127.0.0.1:8000 WILL HAVE TO BE CHANGED TO THE DOMAIN.
 
@@ -277,18 +278,21 @@ def resend(request,pk):
 #TODO: I WAS HERE
 @login_required(login_url='home')
 def cancel(request,pk):
+    event_name=pk
+
     try:
-        event=(request.user.linkage_set.get(event__event=pk)).event #event__event is accessing that event(foriegn key)s event(attribute(name))
-    except:
-        return(redirect('home'))
+        event=Small_trivial_functions.get_event_object(request,event_name)
+    except: #precautionary
+        return(redirect('home')) #TODO: add an error message here (using django flash messages)
+
     curlinkage=linkage.objects.get(user=request.user,event=event)
-    if event not in [i.event for i in request.user.linkage_set.all()]:
-        return(redirect('home'))
-    if curlinkage.seats==None:#if not booked, send home.
-        return(redirect('home'))
+
+    Medium_funcs.precautionary_check_redirect_if_booked_and_if_event_yours(event,request,curlinkage)
+
     if curlinkage.seats not in event.blocked:#If its not there, we dont have to cancel anything. (all these are just fallbacks, JICs)
         return(redirect('home')) #TODO: DISPLAY ERROR MESSAGES HERE AND ALL 
         #TODO: FIX THIS, WHEN ITS NOT IN EVENT.Blocked cancel it in curlinkage atleast!
+
     event.blocked=event.blocked.replace(curlinkage.seats,'')#removing those seats from events blocked seats.
     curlinkage.seats=None#removing seats from curlinkage.
     curlinkage.emailsent=None
