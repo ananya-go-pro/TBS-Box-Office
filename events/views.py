@@ -12,6 +12,8 @@ import base64
 #from django.core.mail import send_mail
 #import ezgmail (TODO: email stuff figure out.) IMP
 
+current_domain='127.0.0.1:8000/'
+
 #TODO: havent tested allbooked
 
 class Small_trivial_functions():
@@ -64,6 +66,77 @@ class Small_trivial_functions():
             
             return (sibling_who_booked)
 
+        def get_latest_event_instance(request,event_name):
+            return((request.user.linkage_set.get(event__event=event_name)).event)
+
+        def check_if_seats_still_available(event,selected_seats):
+            #reloading page if selected seats not empty in latest version of events.
+            if selected_seats in event.blocked:
+                return(redirect(f"/events/{event.red}"))
+
+        def update_event_blocked(event,selected_seats):
+            all_taken_seats=event.blocked #includes booked and reserved seats.
+            if all_taken_seats == None:
+                all_taken_seats=selected_seats
+            else:
+                all_taken_seats+=selected_seats
+            event.blocked=all_taken_seats
+            event.save()
+            
+        def initialize_hallplan_details(curlinkage):
+            #keeping default empty values for all so that it can easily be accesed in js without having to worry wether the key exists.
+            return({"maxseats_user_can_book":curlinkage.maxseats,"A":[],"B":[],"C":[],"D":[],"E":[],"F":[],"G":[],"H":[],"I":[],"J":[],"K":[],"L":[],"M":[],"N":[],"O":[],"AA":[],"BB":[],"CC":[],"DD":[],"EE":[],"FF":[]})
+       
+
+class Medium_funcs():
+    class Hallplan():
+
+        def precautionary_check_redirect_ticket_and_siblings(request,curlinkage,event_name):
+            #redirect to ticket page if aldready booked
+            if curlinkage.seats: 
+                return(redirect(f"/events/ticket/{event_name}"))
+
+            #redirect to siblings page if sibling has booked (have been asked to let a pair of parents book only once.)
+            sibling_who_booked=Small_trivial_functions.Hallplan.check_for_siblings_bookings(request,curlinkage)
+            if sibling_who_booked:
+                return(render(request,'siblings.html',{'i':sibling_who_booked}))
+
+        def handle_post_data(request,curlinkage,event_name):
+            selected_seats = request.POST.get('selected-seats').strip('"')+','
+            event=Small_trivial_functions.Hallplan.get_latest_event_instance(request,event_name)
+                    
+            Small_trivial_functions.Hallplan.check_if_seats_still_available(event,selected_seats) #precuationary
+
+            curlinkage.seats=selected_seats
+            curlinkage.save()
+                    
+            Small_trivial_functions.Hallplan.update_event_blocked(event,selected_seats)
+                    
+            Small_trivial_functions.General_data_record('SeatsBooked')
+
+            return(redirect(f"/events/ticket/{event_name}"))
+
+        def get_json_hallplan_details_for_js(event,curlinkage):
+            
+            hallplan_details=Small_trivial_functions.Hallplan.initialize_hallplan_details(curlinkage)         
+            all_taken_seats=event.blocked.split(',')[:-1] #includes booked and reserved seats
+            #TODO: clean this
+            for i in all_taken_seats: 
+                for j in range(len(i)): #iterating through the seat ID to put them into hallplan_details
+                    if i[j].isdigit():
+                        try:
+                            temp=hallplan_details[i[:j]]
+                            temp.append(int(i[j:]))
+                            hallplan_details[i[:j]]=temp
+                        except:
+                            #this shouldnt happen but just in case the admin has entered some bad data in the blocked.
+                            hallplan_details[i[:j]]=[int(i[j:])]
+                        break
+
+            
+            hallplan_details=json.dumps(hallplan_details).replace("'", '"') #replaces the '' in the dict to "" so that we can pass it to the js (through the html.)
+            return(hallplan_details)
+            
 
 @login_required(login_url='home') #must be logged in to access events.
 def eventspage(request):
@@ -81,6 +154,7 @@ def eventspage(request):
     context['Events']=myevents
     return(render(request,'hi2.html',context))
 
+
 @login_required(login_url='home') #precautionary.
 def hallplan(request,pk): 
     context={}
@@ -93,69 +167,28 @@ def hallplan(request,pk):
         try:
             event=Small_trivial_functions.Hallplan.get_event_object(request,event_name)
         except: #precautionary
-            #TODO: add an error message here (using django flash messages)
-            return(redirect('home'))
+            return(redirect('home')) #TODO: add an error message here (using django flash messages)
 
         curlinkage=linkage.objects.get(user=request.user,event=event)
 
         event.entered=event.entered+1 #keeping this before all redirects so even those are counted.
         event.save()
         
-        #redirect to ticket page if aldready booked
-        if curlinkage.seats: 
-            return(redirect(f"/events/ticket/{event_name}"))
+        Medium_funcs.Hallplan.precautionary_check_redirect_ticket_and_siblings(request,curlinkage,event_name)
+        #TODO: test this, i havent after latest change.
 
-        #redirect to siblings page if sibling has booked (have been asked to let a pair of parents book only once.)
-        sibling_who_booked=Small_trivial_functions.Hallplan.check_for_siblings_bookings(request,curlinkage)
-        if sibling_who_booked:
-            return(render(request,'siblings.html',{'i':sibling_who_booked}))
-
-        #TODO: I WAS HERE
         if request.method == "POST":
-                    seats = request.POST.get('seats')  # Get selected seat IDs from POST data
-                    seats=seats.strip('"')+','
-                    event=(request.user.linkage_set.get(event__event=event_name)).event#refreshing, to check real time, if anyone has booked that justt before this person booked.
-                    if seats in event.blocked:#If somehow the seats have actually gotten booked just before the person clicked book, then reload the page.
-                        return(redirect(f"/events/{event.red}"))
-                    curlinkage.seats=seats
-                    curlinkage.save()
-                    taken=event.blocked
-                    if taken == None:
-                        taken=seats
-                    else:
-                        taken+=seats
-                    event.blocked=taken
-                    event.save()
-                    General_object_instance, created = General.objects.get_or_create(pk=1)
-                    General_object_instance.SeatsBooked+=1
-                    General_object_instance.save()
-                    return(redirect(f"/events/ticket/{event_name}"))
+                    Medium_funcs.Hallplan.handle_post_data(request,curlinkage,event_name)
+        
+        hallplan_details=Medium_funcs.Hallplan.get_json_hallplan_details_for_js(curlinkage,event)
 
-
-        #see if you can make this more efficient.
-        d={"maxseats_user_can_book":curlinkage.maxseats,"A":[],"B":[],"C":[],"D":[],"E":[],"F":[],"G":[],"H":[],"I":[],"J":[],"K":[],"L":[],"M":[],"N":[],"O":[],"AA":[],"BB":[],"CC":[],"DD":[],"EE":[],"FF":[]}
-        #keeping default empty values for all so that it can easily be accesed in js without having to worry wether the key exists.
-        s=event.blocked
-        l=s.split(',')
-        l.pop()
-        for i in l: 
-            for j in range(len(i)):
-                if i[j].isdigit():
-                    try:
-                        temp=d[i[:j]]
-                        temp.append(int(i[j:]))
-                        d[i[:j]]=temp
-                    except:
-                        #this shouldnt happen but just in case the admin has entered some bad data in the blocked.
-                        d[i[:j]]=[int(i[j:])]
-                    break
-        d=json.dumps(d).replace("'", '"') #replaces the '' in the dict to "" so that we can pass it to the js (through the html.)
-        context['blocked']=d
+        context['blocked']=hallplan_details #to pass to javascript and render all seats accordingly.
         context['event']=event
-        context['allbooked']=Small_trivial_functions.Hallplan.check_if_event_full(event)
-        context['notify_path']=event_name #sending event_name to html to have event specific redirects.
+        context['allbooked']=Small_trivial_functions.Hallplan.check_if_event_full(event)#if all seats taken, render notify button.
+        context['notify_path']=event_name #sending event_name to html to have event specific redirects (here for notify).
         return(render(request,'audi.html',context))
     
+#TODO: I WAS HERE
 @login_required(login_url='home')
 def ticket(request,pk):
     try:
@@ -192,6 +225,7 @@ def ticket(request,pk):
         curlinkage.emailsent=timezone.now()
         curlinkage.save()
     return(render(request,'ticket.html',context))
+
 
 @login_required(login_url='home')
 def resend(request,pk):
@@ -230,7 +264,8 @@ def cancel(request,pk):
     if curlinkage.seats==None:#if not booked, send home.
         return(redirect('home'))
     if curlinkage.seats not in event.blocked:#If its not there, we dont have to cancel anything. (all these are just fallbacks, JICs)
-        return(redirect('home'))
+        return(redirect('home')) #TODO: DISPLAY ERROR MESSAGES HERE AND ALL 
+        #TODO: FIX THIS, WHEN ITS NOT IN EVENT.Blocked cancel it in curlinkage atleast!
     event.blocked=event.blocked.replace(curlinkage.seats,'')#removing those seats from events blocked seats.
     curlinkage.seats=None#removing seats from curlinkage.
     curlinkage.emailsent=None

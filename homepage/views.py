@@ -90,7 +90,7 @@ def helloworld(request):
 def loginPage(request):
     if request.user.is_authenticated: 
         return(redirect('events'))
-
+    username_to_autofill=''
     if request.method=="POST":
         USN_exists,user,username_to_autofill=Small_trivial_functions.Login.input_usn_and_check_and_authenticate(request)
         
