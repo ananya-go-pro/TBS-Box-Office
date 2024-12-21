@@ -12,7 +12,7 @@ import base64
 #from django.core.mail import send_mail
 #import ezgmail (TODO: email stuff figure out.) IMP
 
-current_domain='127.0.0.1:8000/'
+current_domain='127.0.0.1:8000/'#HERE, THE 127.0.0.1:8000 WILL HAVE TO BE CHANGED TO THE DOMAIN.
 
 #TODO: havent tested allbooked
 
@@ -21,6 +21,9 @@ class Small_trivial_functions():
         General_object_instance, created = General.objects.get_or_create(pk=1) #in case General_object_instance exists, get the first object. else, create it.
         exec(f"General_object_instance.{data_object}+=1") #just keeping track of the data.
         General_object_instance.save()
+
+    def get_event_object(request,event_name):
+            return(request.user.linkage_set.get(event__event=event_name)).event #checking foriegn keys of all linkages of that user to get that event.
 
     class Test_event_for_emergency_user(): 
         def create_linkage(request):
@@ -42,9 +45,6 @@ class Small_trivial_functions():
             return(my_event)
 
     class Hallplan():
-        def get_event_object(request,event_name):
-            return(request.user.linkage_set.get(event__event=event_name)).event #checking foriegn keys of all linkages of that user to get that event.
-
         def check_if_event_full(event): #returns a true/false
             return(len(event.blocked.split(','))-1==476) #-1 is due to last comma being extra. This is so that we can see if all seats are taken.
 
@@ -86,9 +86,54 @@ class Small_trivial_functions():
         def initialize_hallplan_details(curlinkage):
             #keeping default empty values for all so that it can easily be accesed in js without having to worry wether the key exists.
             return({"maxseats_user_can_book":curlinkage.maxseats,"A":[],"B":[],"C":[],"D":[],"E":[],"F":[],"G":[],"H":[],"I":[],"J":[],"K":[],"L":[],"M":[],"N":[],"O":[],"AA":[],"BB":[],"CC":[],"DD":[],"EE":[],"FF":[]})
-       
+
+    class Ticket():
+        def update_notify_mail(event,request): #if the user has asked to notify and has now gotten a seat/seats, remove his name from notify.
+            if event.notifymail and request.user.email in event.notifymail.split(','): 
+                temp=event.notifymail
+                event.notifymail=temp.replace(request.user.email,'')
+                event.save()
+
+        def get_qr_image_as_string(curlinkage): 
+            #TODO: maybe import bytes io and base64 here if its the only place its used?
+            global current_domain
+            url=current_domain + urllib.parse.quote(f'details/{curlinkage}') #url to be visited by admin at gate on 
+            
+            img=qrcode.make(url) #this is a PILImage.
+            
+            buffered = BytesIO() #converts QR code image into string so it can be saved in database without taking much space.
+            img.save(buffered) #saving image into buffered. (as bytes prolly.)
+            image_str = base64.b64encode(buffered.getvalue()).decode() #making the image into a string that can be sent and rendered in ticket.
+            return(image_str)
+
+        def get_email_content(event_name,event,curlinkage):
+            global current_domain
+            return(f"Ticket: \n\n Link: {current_domain}events/ticket/{urllib.parse.quote(event_name)}/ \n\n Event: {event} \n\n Date and time: {event.Date.strftime('%d/%m/%Y, %H:%M:%S')} \n\n Description: {event.Desc} \n\n Your seats: {curlinkage.seats} \n\n For QR code, please visit the link. \n\n Booked on: {curlinkage.whenbooked.strftime('%d/%m/%Y, %H:%M:%S')} \n\n For any queries, please contact the school.")
 
 class Medium_funcs():
+    def precautionary_check_redirect_if_booked_and_if_event_yours(event,request,curlinkage):
+            if event not in [i.event for i in request.user.linkage_set.all()]:
+                return(redirect('home'))
+            if curlinkage.seats==None:#if not booked, send home.
+                return(redirect('home'))
+
+    def send_email(event,request,curlinkage,event_name):
+            #Sending the email from suadnastorage. #TODO: TO BE CHANGED AND FIGURE OUT email
+            #WAS USING EZGMAIL, NO PROBLEM WITH IT BUT IT IS TEDIOUS AS WE NEED TO KEEP RENEWING GOOGLE API CREDENTIALS AT RANDOM INTERVALS
+            
+            subject=f"Your ticket for {event} on {event.Date.strftime('%d/%m/%Y, %H:%M:%S')}"
+            message=Small_trivial_functions.Ticket.get_email_contents(event_name,event,curlinkage)
+            #fromwhom='suadnastorage@gmail.com'
+            recipients=request.user.email
+
+            #ezgmail.send(recipients, subject=subject, body=message) #TODO make email work and enable it
+            #send_mail(subject, message, fromwhom, recipients,fail_silently=False) #the old smtp i tried using but never worked.
+
+            Small_trivial_functions.General_data_record('emailsent')
+            
+            curlinkage.emailsent=timezone.now()
+            curlinkage.save()
+
     class Hallplan():
 
         def precautionary_check_redirect_ticket_and_siblings(request,curlinkage,event_name):
@@ -136,7 +181,7 @@ class Medium_funcs():
             
             hallplan_details=json.dumps(hallplan_details).replace("'", '"') #replaces the '' in the dict to "" so that we can pass it to the js (through the html.)
             return(hallplan_details)
-            
+
 
 @login_required(login_url='home') #must be logged in to access events.
 def eventspage(request):
@@ -165,7 +210,7 @@ def hallplan(request,pk):
     else:
 
         try:
-            event=Small_trivial_functions.Hallplan.get_event_object(request,event_name)
+            event=Small_trivial_functions.get_event_object(request,event_name)
         except: #precautionary
             return(redirect('home')) #TODO: add an error message here (using django flash messages)
 
@@ -188,70 +233,48 @@ def hallplan(request,pk):
         context['notify_path']=event_name #sending event_name to html to have event specific redirects (here for notify).
         return(render(request,'audi.html',context))
     
-#TODO: I WAS HERE
+#TODO: yet to test this after latest change
 @login_required(login_url='home')
-def ticket(request,pk):
+def ticket(request,pk): 
+    event_name=pk
+
     try:
-        event=(request.user.linkage_set.get(event__event=pk)).event #event__event is accessing that event(foriegn key)s event(attribute(name))
-    except:
-        return(redirect('home'))
+        event=Small_trivial_functions.get_event_object(request,event_name)
+    except: #precautionary
+        return(redirect('home')) #TODO: add an error message here (using django flash messages)
+
     curlinkage=linkage.objects.get(user=request.user,event=event)
-    if event not in [i.event for i in request.user.linkage_set.all()]:
-        return(redirect('home'))
-    if curlinkage.seats==None:#if not booked, send home.
-        return(redirect('home'))
-    if event.notifymail and request.user.email in event.notifymail.split(','): #if the user has asked to notify and has now gotten a seat/seats, remove his name from notify.
-        temp=event.notifymail
-        event.notifymail=temp.replace(request.user.email,'')
-        event.save()
-    url="127.0.0.1:8000/"+urllib.parse.quote(f'details/{curlinkage}')#HERE, THE 127.0.0.1:8000 WILL HAVE TO BE CHANGED TO THE DOMAIN.
-    img=qrcode.make(url) #this is a PILImage.
-    buffered = BytesIO()#this will be the image as a string. need the bytes as that way, i can encode the pilimage into bytes
-    #and then decode that into a string.
-    img.save(buffered) #saving image into buffered. (as bytes prolly.)
-    image_str = base64.b64encode(buffered.getvalue()).decode() #making the image into a string that can be sent and rendered in ticket.
-    context={'Event':event,'EventDeets':event.Date,'desc':event.Desc,'seats':curlinkage.seats,'bookedwhen':curlinkage.whenbooked.strftime("%d/%m/%Y, %H:%M:%S"),'QR':image_str,'pk':pk,'email':request.user.email}
+    QR_as_string=Small_trivial_functions.Ticket.get_qr_image_as_string(curlinkage)
+    
+    Medium_funcs.precautionary_check_redirect_if_booked_and_if_event_yours(event,request,curlinkage)
+
+    Small_trivial_functions.Ticket.update_notify_mail(event,request)
+
     if curlinkage.emailsent==None:#if email has not been sent, send an email.
-        #Sending the email from suadnastorage.
-        subject=f"Your ticket for {event} on {event.Date.strftime('%d/%m/%Y, %H:%M:%S')}"
-        message=f"Ticket: \n\n Link: 127.0.0.1:8000/events/ticket/{urllib.parse.quote(pk)}/ \n\n Event: {event} \n\n Date and time: {event.Date.strftime('%d/%m/%Y, %H:%M:%S')} \n\n Description: {event.Desc} \n\n Your seats: {curlinkage.seats} \n\n For QR code, please visit the link. \n\n Booked on: {curlinkage.whenbooked.strftime('%d/%m/%Y, %H:%M:%S')} \n\n For any queries, please contact the school."
-        #fromwhom='suadnastorage@gmail.com'
-        recipients=request.user.email
-        #ezgmail.send(recipients, subject=subject, body=message) #TODO make ezgmail work
-        General_object_instance, created = General.objects.get_or_create(pk=1)
-        General_object_instance.emailsent+=1
-        General_object_instance.save()
-        #send_mail(subject, message, fromwhom, recipients,fail_silently=False)
-        curlinkage.emailsent=timezone.now()
-        curlinkage.save()
+        Medium_funcs.send_email(event,request,curlinkage,event_name)
+
+    context={'Event':event,'EventDeets':event.Date,'desc':event.Desc,'seats':curlinkage.seats,'bookedwhen':curlinkage.whenbooked.strftime("%d/%m/%Y, %H:%M:%S"),'QR':QR_as_string,'pk':pk,'email':request.user.email}
     return(render(request,'ticket.html',context))
 
-
+#TODO: yet to test after this latest change
 @login_required(login_url='home')
 def resend(request,pk):
+    event_name=pk
+
     try:
-        event=(request.user.linkage_set.get(event__event=pk)).event #event__event is accessing that event(foriegn key)s event(attribute(name))
-    except:
-        return(redirect('home'))
+        event=Small_trivial_functions.get_event_object(request,event_name)
+    except: #precautionary
+        return(redirect('home')) #TODO: add an error message here (using django flash messages)
+
     curlinkage=linkage.objects.get(user=request.user,event=event)
-    if event not in [i.event for i in request.user.linkage_set.all()]:
-        return(redirect('home'))
-    if curlinkage.seats==None:#if not booked, send home.
-        return(redirect('home'))
-    #Sending the email from suadnastorage.
-    subject=f"Your ticket for {event} on {event.Date.strftime('%d/%m/%Y, %H:%M:%S')}"
-    message=f"Ticket: \n\n Link: 127.0.0.1:8000/events/ticket/{urllib.parse.quote(pk)}/ \n\n Event: {event} \n\n Date and time: {event.Date.strftime('%d/%m/%Y, %H:%M:%S')} \n\n Description: {event.Desc} \n\n Your seats: {curlinkage.seats} \n\n For QR code, please visit the link. \n\n Booked on: {curlinkage.whenbooked.strftime('%d/%m/%Y, %H:%M:%S')} \n\n For any queries, please contact the school."
-    #fromwhom='suadnastorage@gmail.com'
-    recipients=request.user.email
-    #ezgmail.send(recipients, subject=subject, body=message) #TODO make ezgmail work
-    General_object_instance, created = General.objects.get_or_create(pk=1)
-    General_object_instance.emailsent+=1
-    General_object_instance.save()
-    #send_mail(subject, message, fromwhom, recipients,fail_silently=False)
-    curlinkage.emailsent=timezone.now()
-    curlinkage.save()
+
+    Medium_funcs.precautionary_check_redirect_if_booked_and_if_event_yours(event,request,curlinkage)
+
+    Medium_funcs.send_email(event,request,curlinkage,event_name)
+
     return(redirect(f'/events/ticket/{pk}/'))
 
+#TODO: I WAS HERE
 @login_required(login_url='home')
 def cancel(request,pk):
     try:
