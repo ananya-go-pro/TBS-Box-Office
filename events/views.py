@@ -23,8 +23,11 @@ class Small_trivial_functions():
         exec(f"General_object_instance.{data_object}+=1") #just keeping track of the data.
         General_object_instance.save()
 
-    def get_event_object(request,event_name):
-            return(request.user.linkage_set.get(event__event=event_name)).event #checking foriegn keys of all linkages of that user to get that event.
+    def try_get_event_object(request,event_name,message=None):
+            try:
+                return(request.user.linkage_set.get(event__event=event_name)).event #checking foriegn keys of all linkages of that user to get that event.
+            except: #precautionary
+                return(redirect('home')) #TODO: add an error message here (using django flash messages)
 
     class Test_event_for_emergency_user(): 
         def create_linkage(request):
@@ -111,6 +114,21 @@ class Small_trivial_functions():
             global current_domain
             return(f"Ticket: \n\n Link: {current_domain}events/ticket/{urllib.parse.quote(event_name)}/ \n\n Event: {event} \n\n Date and time: {event.Date.strftime('%d/%m/%Y, %H:%M:%S')} \n\n Description: {event.Desc} \n\n Your seats: {curlinkage.seats} \n\n For QR code, please visit the link. \n\n Booked on: {curlinkage.whenbooked.strftime('%d/%m/%Y, %H:%M:%S')} \n\n For any queries, please contact the school.")
 
+    class Cancel():
+        def remove_from_curlinkage(curlinkage,message=None):
+            #TODO: log some error message here if needed (either though django flash or preferably via console.log() as this error msg is only for the devs.)
+            curlinkage.seats=None
+            curlinkage.emailsent=None
+            curlinkage.save()
+
+        def remove_from_event_and_log(event,seats):
+            event.blocked=event.blocked.replace(seats,'')#removing those seats from event's blocked seats.
+            event.cancels=event.cancels+1
+            event.save()
+
+        def send_cancellation_mail(request,event):
+            Medium_funcs.send_mail(request.user.email, subject=f"Cancellation of your seats for {event} on {event.Date.strftime('%d/%m/%Y, %H:%M:%S')}", body=f"Your seats for {event} have been cancelled.\nPlease contact the school for further details.")
+    
 class Medium_funcs():
     def precautionary_check_redirect_if_booked_and_if_event_yours(event,request,curlinkage):
             if event not in [i.event for i in request.user.linkage_set.all()]:
@@ -118,7 +136,12 @@ class Medium_funcs():
             if curlinkage.seats==None:#if not booked, send home.
                 return(redirect('home'))
 
-    def send_email(event,request,curlinkage,event_name):
+    def send_email(recipients,subject,body):
+        #ezgmail.send(recipients, subject=subject, body=message) #TODO make email work and enable it
+        #send_mail(subject, message, fromwhom, recipients,fail_silently=False) #the old smtp i tried using but never worked.
+        pass
+
+    def send_ticket_email(event,request,curlinkage,event_name):
             #Sending the email from suadnastorage. #TODO: TO BE CHANGED AND FIGURE OUT email
             #WAS USING EZGMAIL, NO PROBLEM WITH IT BUT IT IS TEDIOUS AS WE NEED TO KEEP RENEWING GOOGLE API CREDENTIALS AT RANDOM INTERVALS
             
@@ -127,13 +150,17 @@ class Medium_funcs():
             #fromwhom='suadnastorage@gmail.com'
             recipients=request.user.email
 
-            #ezgmail.send(recipients, subject=subject, body=message) #TODO make email work and enable it
-            #send_mail(subject, message, fromwhom, recipients,fail_silently=False) #the old smtp i tried using but never worked.
+            Medium_funcs.send_email(recipients,subject,body=message)
 
             Small_trivial_functions.General_data_record('emailsent')
             
             curlinkage.emailsent=timezone.now()
             curlinkage.save()
+
+    def send_all_notifymails(event,event_name):#we send emails to all those who have been asked to be notified when a seat gets available to book. (this is in case of housefull shows)
+        if event.notifymail:
+            for i in [j for j in event.notifymail.split(',') if j not in ' ,']:
+                Medium_funcs.send_email(i, subject=f"Availability of seats for {event}.", body=f"This is to notify you that a seat may be available for {event} as someone has cancelled their seats.\n\n If you do not wish to be notified about this further, please sign in and click this link: {current_domain}/events/cancelnotify/{urllib.parse.quote(event_name)}")
 
     class Hallplan():
 
@@ -209,12 +236,7 @@ def hallplan(request,pk):
     if request.user.is_superuser: #admin can see seatdetails page when they click the event.
         return(redirect(f'/events/seatdetails/{event_name}/')) 
     else:
-
-        try:
-            event=Small_trivial_functions.get_event_object(request,event_name)
-        except: #precautionary
-            return(redirect('home')) #TODO: add an error message here (using django flash messages)
-
+        event=Small_trivial_functions.try_get_event_object(request,event_name,message=None)
         curlinkage=linkage.objects.get(user=request.user,event=event)
 
         event.entered=event.entered+1 #keeping this before all redirects so even those are counted.
@@ -238,11 +260,7 @@ def hallplan(request,pk):
 @login_required(login_url='home')
 def ticket(request,pk): 
     event_name=pk
-
-    try:
-        event=Small_trivial_functions.get_event_object(request,event_name)
-    except: #precautionary
-        return(redirect('home')) #TODO: add an error message here (using django flash messages)
+    event=Small_trivial_functions.try_get_event_object(request,event_name,message=None) #TODO: add an error message here (using django flash messages)
 
     curlinkage=linkage.objects.get(user=request.user,event=event)
     QR_as_string=Small_trivial_functions.Ticket.get_qr_image_as_string(curlinkage)
@@ -252,7 +270,7 @@ def ticket(request,pk):
     Small_trivial_functions.Ticket.update_notify_mail(event,request)
 
     if curlinkage.emailsent==None:#if email has not been sent, send an email.
-        Medium_funcs.send_email(event,request,curlinkage,event_name)
+        Medium_funcs.send_ticket_email(event,request,curlinkage,event_name)
 
     context={'Event':event,'EventDeets':event.Date,'desc':event.Desc,'seats':curlinkage.seats,'bookedwhen':curlinkage.whenbooked.strftime("%d/%m/%Y, %H:%M:%S"),'QR':QR_as_string,'pk':pk,'email':request.user.email}
     return(render(request,'ticket.html',context))
@@ -261,56 +279,43 @@ def ticket(request,pk):
 @login_required(login_url='home')
 def resend(request,pk):
     event_name=pk
-
-    try:
-        event=Small_trivial_functions.get_event_object(request,event_name)
-    except: #precautionary
-        return(redirect('home')) #TODO: add an error message here (using django flash messages)
+    event=Small_trivial_functions.try_get_event_object(request,event_name,message=None) #TODO: add an error message here (using django flash messages)
 
     curlinkage=linkage.objects.get(user=request.user,event=event)
 
     Medium_funcs.precautionary_check_redirect_if_booked_and_if_event_yours(event,request,curlinkage)
 
-    Medium_funcs.send_email(event,request,curlinkage,event_name)
+    Medium_funcs.send_ticket_email(event,request,curlinkage,event_name)
 
     return(redirect(f'/events/ticket/{pk}/'))
 
-#TODO: I WAS HERE
+#TODO: yet to test this and most things after latest change.
 @login_required(login_url='home')
 def cancel(request,pk):
     event_name=pk
-
-    try:
-        event=Small_trivial_functions.get_event_object(request,event_name)
-    except: #precautionary
-        return(redirect('home')) #TODO: add an error message here (using django flash messages)
+    event=Small_trivial_functions.try_get_event_object(request,event_name,message=None)
 
     curlinkage=linkage.objects.get(user=request.user,event=event)
 
     Medium_funcs.precautionary_check_redirect_if_booked_and_if_event_yours(event,request,curlinkage)
 
-    if curlinkage.seats not in event.blocked:#If its not there, we dont have to cancel anything. (all these are just fallbacks, JICs)
-        return(redirect('home')) #TODO: DISPLAY ERROR MESSAGES HERE AND ALL 
-        #TODO: FIX THIS, WHEN ITS NOT IN EVENT.Blocked cancel it in curlinkage atleast!
-
-    event.blocked=event.blocked.replace(curlinkage.seats,'')#removing those seats from events blocked seats.
-    curlinkage.seats=None#removing seats from curlinkage.
-    curlinkage.emailsent=None
-    #ezgmail.send(request.user.email, subject=f"Cancellation of your seats for {event} on {event.Date.strftime('%d/%m/%Y, %H:%M:%S')}", body=f"Your seats for {event} have been cancelled.\nPlease contact the school for further details.")
-    #TODO make ezgmail work
-    curlinkage.save()
-    event.cancels=event.cancels+1
-    event.save()
-    General_object_instance, created = General.objects.get_or_create(pk=1)
-    General_object_instance.Seatscancelled+=1
-    General_object_instance.save()
+    if curlinkage.seats not in event.blocked:#If its not there in event, there has been some error, so cancelling it from curlinkage only 
+        #TODO: LOG SOME ERROR MESSAGE HERE.
+        Small_trivial_functions.Cancel.remove_from_curlinkage(curlinkage,message=None)
+        Small_trivial_functions.Cancel.send_cancellation_mail(request,event)
+        return(redirect('home'))
     
-    if event.notifymail:
-        for i in [j for j in event.notifymail.split(',') if j not in ' ,']:#now we send emails to all those who have been asked to be notified.
-            #ezgmail.send(i, subject=f"Availability of seats for {event}.", body=f"This is to notify you that a seat may be available for {event} as someone has cancelled their seats.\n\n If you do not wish to be notified about this further, please sign in and click this link: 127.0.0.1:8000/events/cancelnotify/{urllib.parse.quote(pk)}")
-            #TODO make ezgmail work.
-            pass #TODO remove.
-    return(redirect('home'))#can change this if wanted.
+    Small_trivial_functions.Cancel.remove_from_event_and_log(event,curlinkage.seats)
+    Small_trivial_functions.Cancel.remove_from_curlinkage(curlinkage,message=None)
+    Small_trivial_functions.Cancel.send_cancellation_mail(request,event)
+
+    Small_trivial_functions.General_data_record('Seatscancelled')
+    
+    Medium_funcs.send_all_notifymails(event,event_name)
+    
+    return(redirect('home'))#can change this if needed.
+
+#TODO: I WAS HERE
 
 #TODO: REPLACE WITH CLEANED ENCRYPT AND TEST
 def encrypt(contents,that): #For any information on this, contact the dev @ suadnastorage@gmail.com (if no reply, can contact surajacharya2005@gmail.com)
