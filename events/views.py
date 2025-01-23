@@ -9,6 +9,9 @@ from django.contrib.auth.decorators import login_required,user_passes_test
 import urllib.parse
 import qrcode
 import base64
+
+#just thoughts: signup, w email verification and captcha, then resetting password via email.
+
 #from django.core.mail import send_mail
 #import ezgmail (TODO: email stuff figure out.) IMP
 #TODO: add flash error messages everywhere you should. If only the devs need to know, put it into console.log?
@@ -317,128 +320,6 @@ def cancel(request,pk):
 
 #TODO: I WAS HERE
 
-#TODO: REPLACE WITH CLEANED ENCRYPT AND TEST
-def encrypt(contents,that): #For any information on this, contact the dev @ suadnastorage@gmail.com (if no reply, can contact surajacharya2005@gmail.com)
-    import random as rn
-    key=''
-    for i in that:
-        for j in range(ord(i)*2):
-            rn.seed(j)
-            t=str(rn.randint(0,1000))
-            key+=t
-    rn.seed(ord(key[0])+int(key[-1]))
-    t=rn.randint(0,len(key)//2)
-    key=key[t::]
-    if len(key)>2000:
-        key=key[0:2000]
-    import pickle
-    out=[]
-    ke,tempo=0,0
-    a=int(key[1])
-    for i in contents:
-        out.append(ord(i))
-    for i in range(a):
-        for j in range(len(out)):
-            try:
-                ke=int(key[tempo])
-            except IndexError:
-                tempo=0
-                ke=int(key[tempo])
-            tempo+=1
-            if i%2==0:
-                out[j]=out[j]+ke
-            else:
-                out[j]=out[j]-ke
-    d=open('store.dat','wb')
-    pickle.dump(out,d)
-    d.close()
-    key=key[::-1]
-    d=open('store.dat','r',encoding='iso-8859-15')
-    con=d.read()
-    out=[]
-    ke,tempo=0,0
-    a=int(key[1])
-    for i in con:
-        out.append(ord(i))
-    for i in range(a):
-        for j in range(len(out)):
-            try:
-                ke=int(key[tempo])
-            except IndexError:
-                tempo=0
-                ke=int(key[tempo])
-            tempo+=1
-            if i%2==0:
-                out[j]=out[j]+ke
-            else:
-                out[j]=out[j]-ke
-    d.close()
-    key=key[::-1]
-    import os
-    os.remove('store.dat')
-    return(out)
-
-#TODO: REPLACE WITH CLEANED VERSION FROM ENCRYPT AND TEST
-def decrypt(out,that):#For any information on this, contact the dev @ suadnastorage@gmail.com (if no reply, can contact surajacharya2005@gmail.com)
-    import random as rn
-    key=''
-    for i in that:
-        for j in range(ord(i)*2):
-            rn.seed(j)
-            t=str(rn.randint(0,1000))
-            key+=t
-    rn.seed(ord(key[0])+int(key[-1]))
-    t=rn.randint(0,len(key)//2)
-    key=key[t::]
-    if len(key)>2000:
-        key=key[0:2000]
-    import pickle
-    ke,tempo=0,0
-    key=key[::-1]
-    a=int(key[1])
-    for i in range(a):
-        for j in range(len(out)):
-            try:
-                ke=int(key[tempo])
-            except IndexError:
-                tempo=0
-                ke=int(key[tempo])
-            tempo+=1
-            if i%2==0:
-                out[j]=out[j]-ke
-            else:
-                out[j]=out[j]+ke
-    data=''
-    for i in out:
-        data+=str(chr(i))
-    key=key[::-1]
-    d=open('store.dat','w',encoding='iso-8859-15')
-    d.write(data)
-    d.close()
-    d=open('store.dat','rb')
-    out=pickle.load(d)
-    d.close()
-    ke,tempo=0,0
-    a=int(key[1])
-    for i in range(a):
-        for j in range(len(out)):
-            try:
-                ke=int(key[tempo])
-            except IndexError:
-                tempo=0
-                ke=int(key[tempo])
-            tempo+=1
-            if i%2==0:
-                out[j]=out[j]-ke
-            else:
-                out[j]=out[j]+ke
-    content=''
-    for i in out:
-        content+=str(chr(i))
-    import os
-    os.remove('store.dat')
-    return(content)
-
 @user_passes_test(lambda u: u.is_superuser,login_url='home') #if user is admin, let them see this page.
 def seatdetails(request,pk):
     event=(events.objects.get(event=pk))
@@ -611,11 +492,13 @@ def cancelnotify(request,pk):
         event.save()
     return(redirect('home'))
 
+#TODO: YET TO TEST THIS and a lot of things AFTER LATEST CHANGE.
 def secret_code_suadna():#For any information on this, contact the dev @ suadnastorage@gmail.com (if no reply, can contact surajacharya2005@gmail.com)
     encrypted_password=[140, 19, 151, 32, 11, 15, 11, 17, -16, 18, 10, 98, 151, 45, 82, 108, 62, 108, 92, 95, 96, 105, 74, 116, 88, 117, 81, 126, 78, 63, 71, 57, 102, 37]
     encrypted_create_user_code=[116, 14, 159, 107, 15, -4, -12, 13, -4, 4, 3, 94, 139, 35, 73, 128, 76, 131, 85, 100, 87, 120, 78, 17, 66, 59, 80, 24, 71, 96, 75, 126, 83, 103, 65, 105, 76, 52, 66, 119, 80, 96, 83, 116, 80, 111, 74, 107, 79, 109, 78, 133, 62, 40, 85, 104, 62, 111, 84, 91, 74, 126, 68, 102, 73, 96, 87, 112, 71, 124, 86, 121, 64, 129, 61, 99, 80, 119, 65, 108, 81, 106, 70, 127, 78, 121, 95, 38, 71, 130, 72, 109, 83, 109, 71, 124, 71, 124, 67, 111, 83, 103, 73, 113, 67, 78, 78, 38, 69, 122, 72, 115, 89, 112, 82, 109, 73, 106, 68, 101, 81, 45, 78, 71, 93, 120, 76, 107, 72, 91, 81, 121, 58, 121, 67, 75, 85, 39, 90, 115, 66, 104, 72, 105, 67, 94, 76, 104, 90, 108, 68, 116, 73, 121, 75, 113, 74, 121, 77, 111, 78, 110, 74, 114, 80, 84, 64, 111, 82, 124, 66, 93, 81, 99, 84, 99, 83, 56, 78, 112, 73, 108, 80, 97, 74, 42, 62, 67, 87, 120, 94, 103, 52, 131, 79, 115, 63, 125, 60, 113, 74, 123, 81, 110, 78, 67, 83, 27, 70, 87, 71, 107, 63, 109, 70, 108, 84, 112, 78, 124, 66, 116, 64, 59, 79, 51, 80, 53, 80, 46, 62, 98, 83, 96, 82, 123, 74, 102, 69, 106, 78, 119, 67, 121, 79, 107, 86, 131, 55, 95, 80, 106, 86, 62, 64, 105, 89, 120, 59, 118, 73, 101, 71, 125, 58, 115, 72, 109, 82, 121, 76, 43, 92, 93, 64, 106, 81, 123, 81, 42, 68, 69, 72, 52, 65, 110, 72, 125, 69, 90, 72, 107, 95, 104, 70, 117, 80, 112, 86, 104, 81, 124, 74, 62, 73, 97, 71, 111, 75, 132, 77, 121, 92, 43, 62, 105, 82, 126, 62, 91, 73, 112, 85, 128, 73, 113, 81, 108, 88, 115, 70, 63, 50, 77, 87, 108, 69, 116, 88, 101, 72, 61, 67, 100, 84, 134, 68, 95, 81, 119, 67, 115, 70, 119, 75, 119, 85, 104, 85, 105, 87, 115, 72, 100, 83, 127, 69, 71, 68, 107, 73, 120, 75, 124, 88, 114, 72, 50, 97, 57]
     return(encrypted_password,encrypted_create_user_code)
 
+#TODO: YET TO TEST THIS and a lot of things AFTER LATEST CHANGE.
 def secret_code_55A555():#For any information on this, contact the dev @ suadnastorage@gmail.com (if no reply, can contact surajacharya2005@gmail.com)
     encrypted_password=[129, 2, 153, 35, 12, 17, 8, -4, -4, 9, 17, 75, 142, 53, 86, 55, 73, 61, 83, 88, 81, 76, 77, 89, 73, 96, 67, 54, 95, 41, 110, 46]
     encrypted_create_user_code=[127, 5, 157, 100, 8, 3, 8, -1, 8, 11, 3, 93, 158, 49, 70, 129, 83, 117, 76, 123, 78, 128, 79, 38, 79, 72, 83, 50, 80, 91, 75, 122, 70, 102, 79, 128, 81, 54, 84, 117, 81, 102, 82, 115, 78, 109, 82, 109, 83, 129, 75, 125, 82, 63, 81, 110, 83, 122, 81, 121, 75, 104, 83, 125, 70, 111, 81, 98, 74, 131, 86, 115, 83, 107, 90, 117, 83, 43, 82, 136, 74, 130, 72, 108, 72, 124, 80, 120, 89, 110, 78, 121, 77, 111, 85, 67, 76, 49, 77, 62, 83, 56, 79, 73, 84, 55, 82, 63, 81, 61, 79, 56, 80, 54, 74, 106, 78, 122, 77, 114, 83, 114, 78, 110, 73, 66, 83, 47, 88, 129, 85, 132, 77, 114, 70, 110, 78, 113, 85, 110, 83, 131, 80, 126, 74, 125, 69, 121, 80, 107, 75, 115, 79, 107, 75, 66, 81, 106, 87, 119, 85, 108, 82, 114, 78, 125, 79, 60, 77, 116, 88, 115, 82, 126, 87, 56, 76, 52, 81, 131, 73, 107, 77, 118, 84, 115, 74, 128, 80, 116, 88, 121, 81, 111, 86, 67, 74, 52, 78, 63, 76, 66, 89, 69, 70, 87, 82, 99, 86, 105, 87, 59, 79, 57, 71, 51, 78, 45, 82, 107, 78, 120, 84, 121, 85, 112, 75, 92, 77, 115, 77, 121, 89, 123, 79, 126, 79, 106, 81, 117, 86, 75, 77, 125, 75, 108, 82, 111, 75, 114, 83, 139, 82, 115, 80, 118, 78, 109, 80, 52, 80, 116, 74, 112, 75, 128, 77, 42, 79, 64, 81, 53, 84, 120, 78, 126, 78, 98, 87, 97, 80, 110, 87, 125, 80, 120, 77, 121, 72, 115, 75, 60, 85, 97, 74, 129, 81, 128, 83, 111, 85, 54, 88, 113, 76, 119, 83, 102, 78, 123, 79, 123, 79, 100, 76, 112, 78, 115, 84, 68, 84, 84, 79, 102, 77, 122, 83, 123, 78, 110, 81, 58, 76, 126, 84, 123, 83, 96, 78, 125, 81, 134, 75, 124, 77, 115, 83, 119, 78, 126, 86, 125, 81, 111, 73, 125, 78, 70, 70, 81, 79, 111, 78, 119, 78, 118, 90, 103, 78, 54, 105, 46]

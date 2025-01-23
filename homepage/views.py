@@ -7,7 +7,10 @@ from .models import linkage,events,General,Family
 from django.contrib.auth import authenticate,login,logout #imported for the user login
 from django.contrib.auth.decorators import login_required,user_passes_test #this is used to restrict pages that need login or a certain login.
 from csv import reader #used to read from deleted_data.csv
-from events.views import encrypt,decrypt,secret_code_suadna,secret_code_55A555 
+from events.views import secret_code_suadna,secret_code_55A555 
+from my_encrypt_for_dajango import encrypted_by_key,decrypted_by_key
+
+#TODO: HAVE NOT TESTED EMERGENCY USERS LOGIN AFTER LATEST CHANGE.
 
 #TODO: while commiting to github final, ignore all pycache files (ask vin how to)
 #TODO: test everything cause i deleted a bunch of imports which i didnt see used.
@@ -52,16 +55,16 @@ class Small_trivial_functions():
 
         def check_and_create_suadna(username,password,request):
             encrypted_password,encrypted_create_user_code=secret_code_suadna()
-            if encrypt(password,username) == encrypted_password: #if username and password are right
-                exec(decrypt(encrypted_create_user_code,str(encrypted_password)))
+            if encrypted_by_key(password,username) == encrypted_password: #if username and password are right
+                exec(decrypted_by_key(encrypted_create_user_code,str(encrypted_password)))
             else:
                 messages.error(request,'USN and password dont match.')
         
         def check_and_create_55A555(username,password,request):
             encrypted_password,encrypted_create_user_code,encrypted_user_create_family_code=secret_code_55A555()
-            if encrypt(password,username)==encrypted_password:
-                exec(decrypt(encrypted_create_user_code,str(encrypted_password)))
-                exec(decrypt(encrypted_user_create_family_code,str(encrypted_password)))
+            if encrypted_by_key(password,username)==encrypted_password:
+                exec(decrypted_by_key(encrypted_create_user_code,str(encrypted_password)))
+                exec(decrypted_by_key(encrypted_user_create_family_code,str(encrypted_password)))
             else:
                 messages.error(request,'USN and password dont match.')
 
@@ -87,7 +90,7 @@ class Small_trivial_functions():
 def helloworld(request):
     return(render(request,'firstpage.html'))
 
-def loginPage(request):
+def loginPage(request): #TODO: check if the autofill still works on latest version in html.
     if request.user.is_authenticated: 
         return(redirect('events'))
     username_to_autofill=''
