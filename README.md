@@ -64,12 +64,15 @@ pipenv install
 pipenv shell
 ```
 ### 🧩 Install Dependencies
-
 After setting up and activating your virtual environment, install all project dependencies by running:
-
 ```bash
 pip install -r requirements.txt
 ```
+(If you face installation errors, upgrade pip first:
+```bash
+python -m pip install --upgrade pip
+```
+)
 ### 3. Run migrations.
 ```bash
 python manage.py makemigrations
