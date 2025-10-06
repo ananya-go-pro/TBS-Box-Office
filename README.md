@@ -36,16 +36,16 @@ This repository has been restructured for **HackNight**, enabling open-source co
 
 ## 📁 Project Structure
 
-#├── events/ # Core Django app for event and ticket logic
-#├── homepage/ # Landing page and general website routes
-#├── new/ # Optional or in-progress modules
-#├── static/ # Static assets (CSS, JS, images)
-#├── templates/ # HTML templates
-#├── db.sqlite3 # Default SQLite database (for dev)
-#├── manage.py # Django project management script
-#├── Pipfile / Pipfile.lock # Dependency management (Pipenv)
-#├── README.md # Project documentation
-#└── deleted_data.csv # Sample / archived data
+├── events/ # Core Django app for event and ticket logic\
+├── homepage/ # Landing page and general website routes\
+├── new/ # Optional or in-progress modules\
+├── static/ # Static assets (CSS, JS, images)\
+├── templates/ # HTML templates\
+├── db.sqlite3 # Default SQLite database (for dev)\
+├── manage.py # Django project management script\
+├── Pipfile / Pipfile.lock # Dependency management (Pipenv)\
+├── README.md # Project documentation\
+└── deleted_data.csv # Sample / archived data\
 
 
 ---
