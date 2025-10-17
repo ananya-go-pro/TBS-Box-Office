@@ -108,4 +108,10 @@ python manage.py createsuperuser
 
 ---
 
-##Please refer to CONTRIBUTING.md
+## Please refer to CONTRIBUTING.md
+
+---
+
+## This repository is open source and is protected under MIT License.
+
+---
