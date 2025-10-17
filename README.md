@@ -105,3 +105,7 @@ python manage.py createsuperuser
 ### 4. Make your changes and commit them with clear, descriptive messages:
 ### 5. Push your changes to your fork:
 ### 6. Open a Pull Request (PR) from your branch to the main branch of the original repository, describing your changes in detail.
+
+---
+
+##Please refer to CONTRIBUTING.md
