@@ -65,7 +65,11 @@
 
     <div class="space2"></div>
     <div class="container">
-        <!--QR is missing-->
+        {% if QR %}
+        <div class="qr-code">
+            <img src="data:image/png;base64,{{ QR }}" alt="QR Code" style="max-width: 200px; height: auto; margin-bottom: 1rem;">
+        </div>
+        {% endif %}
         <div class="event-name">{{ Event }}</div>
         <div class="ticket-details">
             <p>Timing: {{ EventDeets }}</p>
